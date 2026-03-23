@@ -1,0 +1,11 @@
+part of {{.PubName}}.api;
+{{with .Operations}}
+
+
+class {{.Classname}} {
+  final ApiClient apiClient;
+
+  {{.Classname}}([apiClient]) : apiClient = apiClient ?? defaultApiClient;
+
+{{renderOperations .Operations}}}
+{{end}}

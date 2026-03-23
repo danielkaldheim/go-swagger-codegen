@@ -1,0 +1,28 @@
+{{define "type_alias"}}class {{.Classname}} {
+  final {{.DataType}} value;
+  const {{.Classname}}._(this.value);
+
+  factory {{.Classname}}.fromJson(dynamic data) => {{.Classname}}._(data as {{.DataType}});
+
+  static dynamic encode({{.Classname}} data) => data.value;
+
+  @override
+  String toString() => value.toString();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is {{.Classname}} && value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  static List<{{.Classname}}> listFromJson(List<dynamic> json) =>
+      json.map((value) => {{.Classname}}.fromJson(value)).toList();
+
+  static Map<String, {{.Classname}}> mapFromJson(Map<String, dynamic> json) {
+    var map = <String, {{.Classname}}>{};
+    json.forEach((key, value) => map[key] = {{.Classname}}.fromJson(value));
+    return map;
+  }
+}
+{{end}}

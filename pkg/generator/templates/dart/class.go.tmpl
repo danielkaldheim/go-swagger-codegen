@@ -1,0 +1,39 @@
+{{define "class"}}class {{.Classname}} {{if .HasId}}extends BaseModel {{end}}{
+  {{renderVarDecls .Vars}}
+  {{.Classname}}({{if .HasVars}}{
+    {{renderCtorParams .Vars}}
+    }{{end}});
+
+  @override
+  String toString() {
+    return '{{.Classname}}[{{renderToStringVars .Vars}}]';
+  }
+
+  {{.Classname}}.fromJson(Map<String, dynamic> json) {
+    if (json.isEmpty) return;
+{{renderFromJsonBody .Vars}}  }
+
+  {{if .HasId}}@override {{end}}
+  Map<String, dynamic> toJson() {
+    return {
+{{renderToJsonBody .Vars}}     }..removeWhere((key, value) => value == null || (value is String && value == ''));
+  }
+
+  static List<{{.Classname}}> listFromJson(List<dynamic> json) {
+    return json.isEmpty ? [] : json.map((value) => {{.Classname}}.fromJson(value)).toList();
+  }
+
+  static Map<String, {{.Classname}}> mapFromJson(Map<String, Map<String, dynamic>> json) {
+    var map = <String, {{.Classname}}>{};
+    if (json.isNotEmpty) {
+      json.forEach((String key, Map<String, dynamic> value) => map[key] = {{.Classname}}.fromJson(value));
+    }
+    return map;
+  }
+
+  {{if .HasVars}}{{.Classname}} copyWith({
+{{renderCopyWithParams .Vars}}  }) =>
+      {{.Classname}}(
+{{renderCopyWithArgs .Vars}}      );{{end}}
+}
+{{end}}

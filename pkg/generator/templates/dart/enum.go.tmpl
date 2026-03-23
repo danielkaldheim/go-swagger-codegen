@@ -1,0 +1,31 @@
+{{define "enum"}}class {{.Classname}} {
+  /// The underlying value of this enum member.
+  {{.DataType}} value;
+
+  {{.Classname}}._internal(this.value);
+
+  {{if .AllowableValues}}
+    {{range .AllowableValues.EnumVars}}
+      {{if .Description}}
+  /// {{.Description}}
+      {{end}}
+  static {{$.Classname}} {{.Name}} = {{$.Classname}}._internal({{.Value}});
+    {{end}}
+  {{end}}
+
+  {{.Classname}}.fromJson(dynamic data) {
+    switch (data) {
+    {{if .AllowableValues}}
+      {{range .AllowableValues.EnumVars}}
+          case {{.Value}}: value = data; break;
+      {{end}}
+    {{end}}
+    default: throw('Unknown enum value to decode: $data');
+    }
+  }
+
+  static dynamic encode({{.Classname}} data) {
+    return data.value;
+  }
+}
+{{end}}

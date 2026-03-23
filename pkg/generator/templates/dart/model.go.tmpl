@@ -1,0 +1,3 @@
+part of {{.PubName}}.api;
+
+{{range .Models}}{{with .Model}}{{if .IsEnum}}{{template "enum" .}}{{else}}{{if .IsAlias}}{{template "type_alias" .}}{{else}}{{template "class" .}}{{end}}{{end}}{{end}}{{end}}

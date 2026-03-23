@@ -1,0 +1,12 @@
+part of {{.PubName}}.api;
+
+final apiClientProvider = Provider<ApiClient>((ref) {
+    throw UnimplementedError();
+});
+
+{{range .ApiInfo.Apis}}
+final {{.ClassVarName}}ApiProvider = Provider<{{.Classname}}>((ref) {
+  ApiClient client = ref.watch(apiClientProvider);
+  return {{.Classname}}(client);
+});
+{{end -}}
