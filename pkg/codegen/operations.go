@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -56,6 +57,7 @@ type ParamData struct {
 	HasMore          bool
 	CollectionFormat string
 	Description      string
+	DefaultValue     string
 	Example          string
 }
 
@@ -197,8 +199,6 @@ func buildOperation(path, method string, op *swagger.Operation, spec *swagger.Sp
 	// Parameters
 	for _, param := range op.Parameters {
 		pd := buildParam(param, spec.Definitions)
-
-		operation.AllParams = append(operation.AllParams, pd)
 		operation.HasParams = true
 
 		switch param.In {
@@ -219,6 +219,8 @@ func buildOperation(path, method string, op *swagger.Operation, spec *swagger.Sp
 			operation.FormParams = append(operation.FormParams, pd)
 			operation.HasFormParams = true
 		}
+
+		operation.AllParams = append(operation.AllParams, pd)
 
 		if !param.Required {
 			operation.HasOptionalParams = true
@@ -297,6 +299,11 @@ func buildParam(param swagger.Parameter, definitions map[string]*swagger.Schema)
 	}
 
 	pd.NotFile = !pd.IsFile
+
+	// Default value
+	if param.Default != nil {
+		pd.DefaultValue = fmt.Sprintf("%v", param.Default)
+	}
 
 	// Remove "contentType" conflict with the template variable
 	if strings.ToLower(pd.ParamName) == "contenttype" {

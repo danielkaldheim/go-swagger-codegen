@@ -73,6 +73,7 @@ type Parameter struct {
 	CollectionFormat string  `json:"collectionFormat"`
 	Items            *Schema `json:"items,omitempty"`
 	Enum             []interface{} `json:"enum,omitempty"`
+	Default          interface{}   `json:"default,omitempty"`
 }
 
 type Response struct {

@@ -38,7 +38,10 @@ func buildFuncMap() template.FuncMap {
 		"renderToStringVars":  renderToStringVars,
 		"renderFromJsonBody":  renderFromJsonBody,
 		"renderToJsonBody":    renderToJsonBody,
-		"renderCopyWithParams": renderCopyWithParams,
-		"renderCopyWithArgs":  renderCopyWithArgs,
+		"renderCopyWithParams":  renderCopyWithParams,
+		"renderCopyWithArgs":   renderCopyWithArgs,
+		"renderReadmeApiTable": renderReadmeApiTable,
+		"renderReadmeModelList": renderReadmeModelList,
+		"renderReadmeAuth":     renderReadmeAuth,
 	}
 }

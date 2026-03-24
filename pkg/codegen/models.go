@@ -95,9 +95,7 @@ func buildModel(name string, schema *swagger.Schema, definitions map[string]*swa
 	if len(schema.Enum) > 0 {
 		model.IsEnum = true
 		model.AllowableValues = &AllowableValues{}
-		for _, v := range schema.Enum {
-			model.AllowableValues.Values = append(model.AllowableValues.Values, v)
-		}
+		model.AllowableValues.Values = append(model.AllowableValues.Values, schema.Enum...)
 	}
 
 	// Check x-enum-values vendor extension

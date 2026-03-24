@@ -8,9 +8,15 @@ import (
 	"gitlab.crudus.no/crudus/swagger-codegen/pkg/codegen"
 )
 
-// escapeText escapes double quotes in description text (matches Java codegen behavior).
+// escapeText mimics Java DefaultCodegen.escapeText():
+// collapse whitespace, escape backslash, escape double-quotes.
 func escapeText(s string) string {
-	return strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\t", " ")
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	return s
 }
 
 // htmlEscape applies Mustache-style HTML entity escaping ({{var}} behavior).
@@ -383,6 +389,54 @@ func renderOperation(sb *strings.Builder, op *codegen.OperationData) {
 	}
 	sb.WriteString("    }\n")
 	sb.WriteString("  }\n")
+}
+
+// renderReadmeApiTable renders the API endpoints table for README.md.
+func renderReadmeApiTable(apis []codegen.ApiData, apiDocPath string) string {
+	var sb strings.Builder
+	for _, api := range apis {
+		for _, op := range api.Operations {
+			anchor := strings.ToLower(op.Nickname)
+			fmt.Fprintf(&sb, "*%s* | [**%s**](%s/%s.md#%s) | **%s** %s | %s\n",
+				api.Classname, op.Nickname, apiDocPath, api.Classname, anchor,
+				op.HttpMethod, op.Path, htmlEscape(op.Summary))
+		}
+	}
+	return sb.String()
+}
+
+// renderReadmeModelList renders the model documentation list for README.md.
+func renderReadmeModelList(models []codegen.ModelData, modelDocPath string) string {
+	var sb strings.Builder
+	for _, m := range models {
+		fmt.Fprintf(&sb, " - [%s](%s/%s.md)\n", m.Classname, modelDocPath, m.Classname)
+	}
+	return sb.String()
+}
+
+// renderReadmeAuth renders the authorization documentation for README.md.
+func renderReadmeAuth(authMethods []codegen.AuthMethodData) string {
+	var sb strings.Builder
+	for _, auth := range authMethods {
+		sb.WriteString("\n")
+		fmt.Fprintf(&sb, "## %s\n", auth.Name)
+		sb.WriteString("\n")
+		if auth.IsApiKey {
+			sb.WriteString("- **Type**: API key\n")
+			fmt.Fprintf(&sb, "- **API key parameter name**: %s\n", auth.KeyParamName)
+			if auth.IsKeyInHeader {
+				sb.WriteString("- **Location**: HTTP header\n")
+			} else {
+				sb.WriteString("- **Location**: URL query string\n")
+			}
+		} else if auth.IsBasic {
+			sb.WriteString("- **Type**: HTTP basic authentication\n")
+		} else if auth.IsOAuth {
+			sb.WriteString("- **Type**: OAuth\n")
+			sb.WriteString("- **Flow**: implicit\n")
+		}
+	}
+	return sb.String()
 }
 
 func renderReturnStatement(sb *strings.Builder, op *codegen.OperationData) {

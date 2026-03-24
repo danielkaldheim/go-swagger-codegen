@@ -11,6 +11,7 @@ type GlobalData struct {
 	BasePath       string
 	AppVersion     string
 	AppDescription string
+	InfoEmail      string
 	ApiDocPath     string
 	ModelDocPath   string
 	Models         []codegen.ModelData

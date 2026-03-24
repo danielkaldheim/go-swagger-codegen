@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"gitlab.crudus.no/crudus/swagger-codegen/pkg/codegen"
@@ -76,6 +77,11 @@ func (g *Generator) Generate() error {
 		return fmt.Errorf("generating supporting files: %w", err)
 	}
 
+	// Generate documentation
+	if err := g.generateDocs(); err != nil {
+		return fmt.Errorf("generating docs: %w", err)
+	}
+
 	return nil
 }
 
@@ -98,6 +104,7 @@ func (g *Generator) globalData() GlobalData {
 	if len(g.spec.Schemes) > 0 {
 		basePath = g.spec.Schemes[0] + "://" + g.spec.Host + g.spec.BasePath
 	}
+	basePath = strings.TrimRight(basePath, "/")
 
 	return GlobalData{
 		PubName:        g.config.PubName,
@@ -107,6 +114,7 @@ func (g *Generator) globalData() GlobalData {
 		BasePath:       basePath,
 		AppVersion:     g.spec.Info.Version,
 		AppDescription: g.spec.Info.Description,
+		InfoEmail:      g.spec.Info.Contact.Email,
 		ApiDocPath:     "docs/",
 		ModelDocPath:   "docs/",
 		Models:         g.models,
