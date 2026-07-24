@@ -6,11 +6,13 @@ import (
 )
 
 type Config struct {
-	PubName          string `json:"pubName"`
-	PubVersion       string `json:"pubVersion"`
-	PubDescription   string `json:"pubDescription"`
-	BrowserClient    bool   `json:"browserClient"`
-	UseEnumExtension bool   `json:"useEnumExtension"`
+	PubName          string   `json:"pubName"`
+	PubVersion       string   `json:"pubVersion"`
+	PubDescription   string   `json:"pubDescription"`
+	BrowserClient    bool     `json:"browserClient"`
+	UseEnumExtension bool     `json:"useEnumExtension"`
+	ExcludeApi       []string `json:"excludeApi"`
+	ExcludeModel     []string `json:"excludeModel"`
 }
 
 func Load(path string) (*Config, error) {

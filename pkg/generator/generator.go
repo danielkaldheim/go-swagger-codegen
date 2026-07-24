@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,18 +18,30 @@ type Generator struct {
 	config    *config.Config
 	spec      *swagger.Spec
 	outputDir string
+	language  string
+	variant   string
 	models    []codegen.ModelData
 	apis      []codegen.ApiData
 	auth      []codegen.AuthMethodData
 	tmpl      *template.Template
 }
 
-func New(cfg *config.Config, spec *swagger.Spec, outputDir string) *Generator {
+func New(cfg *config.Config, spec *swagger.Spec, outputDir, language, variant string) *Generator {
 	return &Generator{
 		config:    cfg,
 		spec:      spec,
 		outputDir: outputDir,
+		language:  language,
+		variant:   variant,
 	}
+}
+
+// templateDir returns the template subdirectory name for the selected language/variant.
+func (g *Generator) templateDir() string {
+	if g.variant != "" {
+		return g.language + "-" + g.variant
+	}
+	return g.language
 }
 
 func (g *Generator) Generate() error {
@@ -40,6 +53,16 @@ func (g *Generator) Generate() error {
 
 	// Build auth methods
 	g.auth = codegen.BuildAuthMethods(g.spec.SecurityDefinitions)
+
+	// Filter excluded models
+	if len(g.config.ExcludeModel) > 0 {
+		g.models = filterModels(g.models, g.config.ExcludeModel)
+	}
+
+	// Filter excluded APIs
+	if len(g.config.ExcludeApi) > 0 {
+		g.apis = filterApis(g.apis, g.config.ExcludeApi)
+	}
 
 	// Load templates
 	if err := g.loadTemplates(); err != nil {
@@ -86,15 +109,37 @@ func (g *Generator) Generate() error {
 }
 
 func (g *Generator) loadTemplates() error {
+	dir := "templates/" + g.templateDir()
+
+	// Validate that the selected template directory exists
+	if _, err := fs.Stat(templateFS, dir); err != nil {
+		available, _ := listAvailableLanguages()
+		return fmt.Errorf("template directory %q not found; available: %s",
+			g.templateDir(), strings.Join(available, ", "))
+	}
+
+	// Create a sub-filesystem rooted at the selected language directory
+	subFS, err := fs.Sub(templateFS, dir)
+	if err != nil {
+		return fmt.Errorf("creating sub-filesystem for %s: %w", dir, err)
+	}
+
 	funcMap := buildFuncMap()
 
-	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFS,
-		"templates/dart/*.go.tmpl",
-		"templates/dart/auth/*.go.tmpl",
-	)
+	// Parse top-level templates
+	tmpl, err := template.New("").Funcs(funcMap).ParseFS(subFS, "*.go.tmpl")
 	if err != nil {
-		return err
+		return fmt.Errorf("parsing templates in %s: %w", dir, err)
 	}
+
+	// Parse auth/ subdirectory if it exists (not all languages may have auth templates)
+	if _, statErr := fs.Stat(subFS, "auth"); statErr == nil {
+		tmpl, err = tmpl.ParseFS(subFS, "auth/*.go.tmpl")
+		if err != nil {
+			return fmt.Errorf("parsing auth templates in %s: %w", dir, err)
+		}
+	}
+
 	g.tmpl = tmpl
 	return nil
 }
@@ -208,4 +253,32 @@ func (g *Generator) generateApis() error {
 		}
 	}
 	return nil
+}
+
+func filterModels(models []codegen.ModelData, exclude []string) []codegen.ModelData {
+	excludeSet := make(map[string]bool, len(exclude))
+	for _, name := range exclude {
+		excludeSet[name] = true
+	}
+	filtered := make([]codegen.ModelData, 0, len(models))
+	for _, m := range models {
+		if !excludeSet[m.Classname] {
+			filtered = append(filtered, m)
+		}
+	}
+	return filtered
+}
+
+func filterApis(apis []codegen.ApiData, exclude []string) []codegen.ApiData {
+	excludeSet := make(map[string]bool, len(exclude))
+	for _, name := range exclude {
+		excludeSet[name] = true
+	}
+	filtered := make([]codegen.ApiData, 0, len(apis))
+	for _, a := range apis {
+		if !excludeSet[a.Classname] {
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered
 }

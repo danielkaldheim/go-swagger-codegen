@@ -1,2 +1,7 @@
 swagger-codegen
 output/
+testdata/
+*.log
+packages/
+.claude
+.secrets
