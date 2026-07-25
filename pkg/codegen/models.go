@@ -265,11 +265,41 @@ func buildNativeEnumMembers(fromSpec []string, fromConfig []string) []EnumMember
 			continue
 		}
 		members = append(members, EnumMember{
-			Name:      Camelize(strings.ReplaceAll(value, "-", "_"), true),
+			Name:      toEnumMemberName(value),
 			WireValue: value,
 		})
 	}
 	return members
+}
+
+// enumMemberCollisions are the names a Dart enum member may not take even
+// though they are not language keywords: every enum inherits them from Enum
+// and Object, so a wire value like "index" or "values" would not compile.
+var enumMemberCollisions = map[string]bool{
+	"index": true, "values": true, "hashCode": true, "runtimeType": true,
+	"toString": true, "noSuchMethod": true,
+}
+
+// toEnumMemberName turns a wire value into a legal Dart enum member.
+//
+// Wire values are chosen by the API, not by Dart, so they routinely collide
+// with keywords ("new") or with what Enum already defines ("index"). Escaping
+// here keeps the collision out of the generated file rather than out of the
+// API's vocabulary.
+func toEnumMemberName(value string) string {
+	name := Camelize(strings.ReplaceAll(value, "-", "_"), true)
+	if name == "" {
+		return name
+	}
+	if IsReservedWord(name) || enumMemberCollisions[name] {
+		return EscapeReservedWord(name)
+	}
+	// A value that starts with a digit ("4wd") camelizes to something Dart
+	// cannot parse as an identifier.
+	if r := rune(name[0]); r >= '0' && r <= '9' {
+		return "v" + name
+	}
+	return name
 }
 
 // NativeEnumUnknownMember is the fallback member every generated Dart enum
