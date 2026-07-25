@@ -9,12 +9,17 @@
     return '{{.Classname}}[data=$data]';
   }
 
+  /// Each value is converted, not cast. `Map.from` only re-types the map, so
+  /// for a map of models it hands back the raw decoded maps and blows up on
+  /// first use with "_Map<String, dynamic> is not a subtype of ...".
   factory {{.Classname}}.fromJson(dynamic json) {
     if (json == null || json is! Map) {
       return {{.Classname}}();
     }
     return {{.Classname}}(
-      data: Map<String, {{.DataType}}>.from(json),
+      data: json.map<String, {{.DataType}}>(
+        (key, value) => MapEntry(key.toString(), {{elementFromJson .DataType "value"}}),
+      ),
     );
   }
 
