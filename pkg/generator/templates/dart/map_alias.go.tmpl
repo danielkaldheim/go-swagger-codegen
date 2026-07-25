@@ -1,0 +1,45 @@
+{{define "map_alias"}}class {{.Classname}} {
+  final Map<String, {{.DataType}}> data;
+
+  {{.Classname}}({Map<String, {{.DataType}}>? data})
+      : data = data != null ? Map<String, {{.DataType}}>.from(data) : {};
+
+  @override
+  String toString() {
+    return '{{.Classname}}[data=$data]';
+  }
+
+  factory {{.Classname}}.fromJson(dynamic json) {
+    if (json == null || json is! Map) {
+      return {{.Classname}}();
+    }
+    return {{.Classname}}(
+      data: Map<String, {{.DataType}}>.from(json),
+    );
+  }
+
+  Map<String, {{.DataType}}> toJson() => data;
+
+  /// Returns a copy with one entry set, or removed when [value] is null.
+  /// Free-form maps are edited far more often than they are replaced.
+  {{.Classname}} copyWithEntry(String key, {{.DataType}}? value) {
+    final next = Map<String, {{.DataType}}>.from(data);
+    if (value == null) {
+      next.remove(key);
+    } else {
+      next[key] = value;
+    }
+    return {{.Classname}}(data: next);
+  }
+
+  static List<{{.Classname}}> listFromJson(List<dynamic> json) {
+    return json.isEmpty ? [] : json.map((value) => {{.Classname}}.fromJson(value)).toList();
+  }
+
+  static Map<String, {{.Classname}}> mapFromJson(Map<String, dynamic> json) {
+    var map = <String, {{.Classname}}>{};
+    json.forEach((String key, dynamic value) => map[key] = {{.Classname}}.fromJson(value));
+    return map;
+  }
+}
+{{end}}

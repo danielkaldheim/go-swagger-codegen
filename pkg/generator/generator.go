@@ -46,7 +46,7 @@ func (g *Generator) templateDir() string {
 
 func (g *Generator) Generate() error {
 	// Build model data
-	g.models = codegen.BuildModels(g.spec.Definitions, g.spec.Definitions, g.config.UseEnumExtension, g.spec.DefinitionOrder)
+	g.models = codegen.BuildModels(g.spec.Definitions, g.spec.Definitions, g.config.UseEnumExtension, g.spec.DefinitionOrder, g.config.NativeEnums)
 
 	// Build API data
 	g.apis = codegen.BuildApis(g.spec)
@@ -62,6 +62,13 @@ func (g *Generator) Generate() error {
 	// Filter excluded APIs
 	if len(g.config.ExcludeApi) > 0 {
 		g.apis = filterApis(g.apis, g.config.ExcludeApi)
+	}
+
+	// Prune models not reachable from the (post-filter) API surface. This runs
+	// after the exclude filters so removing an API also drops the models only
+	// that API needed, and manually excluded models are never re-introduced.
+	if g.config.PruneUnusedModels {
+		g.models = codegen.PruneUnusedModels(g.models, g.apis, g.config.KeepModel)
 	}
 
 	// Load templates

@@ -46,7 +46,7 @@ class ApiClient {
           return value is double ? value : double.parse('$value');
         {{- range .Models}}
         case '{{.Classname}}':
-          return {{.Classname}}.fromJson(value);
+          {{if .IsNativeEnum}}return {{camelizeLower .Classname}}FromJson(value);{{else}}return {{.Classname}}.fromJson(value);{{end}}
         {{- end}}
         default:
           {

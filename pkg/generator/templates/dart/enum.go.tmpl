@@ -27,5 +27,14 @@
   static dynamic encode({{.Classname}} data) {
     return data.value;
   }
+
+  /// Lets `json.encode` reach this type. `encode` above is static, so it only
+  /// helps a caller that already knows the concrete type; anything generic — a
+  /// request body carrying this field, or a cache writing the whole model —
+  /// needs an instance `toJson()` or it throws
+  /// "Converting object to an encodable object failed".
+  {{.DataType}} toJson() {
+    return value;
+  }
 }
 {{end}}

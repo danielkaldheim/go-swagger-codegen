@@ -16,6 +16,7 @@ var (
 	configFile string
 	language   string
 	variant    string
+	pruneUnusedModels bool
 )
 
 func init() {
@@ -24,6 +25,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&configFile, "config", "c", "", "Path to config.json")
 	generateCmd.Flags().StringVarP(&language, "language", "l", "dart", "Target language for code generation")
 	generateCmd.Flags().StringVar(&variant, "variant", "", "Language variant (e.g., 'blocks' for dart-blocks templates)")
+	generateCmd.Flags().BoolVar(&pruneUnusedModels, "prune-unused-models", false, "Only generate models reachable from the (non-excluded) API surface")
 	generateCmd.MarkFlagRequired("input")
 	rootCmd.AddCommand(generateCmd)
 }
@@ -35,6 +37,13 @@ var generateCmd = &cobra.Command{
 		cfg, err := config.Load(configFile)
 		if err != nil {
 			return fmt.Errorf("loading config: %w", err)
+		}
+
+		// The --prune-unused-models flag overrides the config, but only when
+		// explicitly provided, so a config value of true is not clobbered by
+		// the flag's default of false.
+		if cmd.Flags().Changed("prune-unused-models") {
+			cfg.PruneUnusedModels = pruneUnusedModels
 		}
 
 		specData, err := os.ReadFile(inputFile)

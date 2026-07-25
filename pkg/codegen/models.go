@@ -14,6 +14,10 @@ type ModelData struct {
 	Description      string
 	IsEnum           bool
 	IsAlias          bool
+	IsListAlias      bool // top-level `type: array`; DataType is the element type
+	IsMapAlias       bool // top-level free-form map; DataType is the value type
+	IsNativeEnum     bool // render as a real Dart enum rather than a string wrapper
+	EnumMembers      []EnumMember
 	HasVars          bool
 	HasId            bool
 	DataType         string // for enums/aliases, the underlying type
@@ -39,6 +43,15 @@ type PropertyData struct {
 	Items           *ItemData
 	IsLast          bool
 	EnumValues      []string // inline enum values for property-level enums
+	IsNativeEnumRef bool     // property's type is a generated native Dart enum
+
+	// Map value shape. Set only when IsMapContainer is true, and needed
+	// because a map's value can itself be a list or a model — which
+	// ComplexType alone cannot express.
+	MapValueDatatype    string // "double", "String", "RecipeNutrientTotal", "List<Foo>"
+	MapValueComplexType string // model name of the value, or of the list element
+	MapValueIsList      bool
+	MapValueIsDouble    bool
 }
 
 type ItemData struct {
@@ -56,8 +69,19 @@ type EnumVar struct {
 	Description string
 }
 
+// EnumMember is one member of a native Dart enum. The unknown fallback has an
+// empty WireValue: it is what unrecognised input decodes to, and it must never
+// be sent back.
+type EnumMember struct {
+	Name      string
+	WireValue string
+}
+
+// IsUnknown reports whether this is the fallback member.
+func (m EnumMember) IsUnknown() bool { return m.WireValue == "" }
+
 // BuildModels extracts model data from swagger definitions.
-func BuildModels(definitions map[string]*swagger.Schema, defs map[string]*swagger.Schema, useEnumExtension bool, definitionOrder []string) []ModelData {
+func BuildModels(definitions map[string]*swagger.Schema, defs map[string]*swagger.Schema, useEnumExtension bool, definitionOrder []string, nativeEnums map[string][]string) []ModelData {
 	var models []ModelData
 
 	// Use definitionOrder to preserve JSON key order, fallback to sorted
@@ -72,14 +96,14 @@ func BuildModels(definitions map[string]*swagger.Schema, defs map[string]*swagge
 
 	for _, name := range names {
 		schema := definitions[name]
-		model := buildModel(name, schema, defs, useEnumExtension)
+		model := buildModel(name, schema, defs, useEnumExtension, nativeEnums)
 		models = append(models, model)
 	}
 
 	return models
 }
 
-func buildModel(name string, schema *swagger.Schema, definitions map[string]*swagger.Schema, useEnumExtension bool) ModelData {
+func buildModel(name string, schema *swagger.Schema, definitions map[string]*swagger.Schema, useEnumExtension bool, nativeEnums map[string][]string) ModelData {
 	classname := ToModelName(name)
 	model := ModelData{
 		Classname:        classname,
@@ -136,7 +160,7 @@ func buildModel(name string, schema *swagger.Schema, definitions map[string]*swa
 
 		for _, propName := range propNames {
 			prop := schema.Properties[propName]
-			pd := buildProperty(propName, prop, definitions, requiredSet[propName])
+			pd := buildProperty(propName, prop, definitions, requiredSet[propName], nativeEnums)
 
 			if propName == "id" {
 				model.HasId = true
@@ -159,14 +183,45 @@ func buildModel(name string, schema *swagger.Schema, definitions map[string]*swa
 		// In Java codegen, object types and array types become classes,
 		// while simple scalar types (string, integer) become type aliases.
 		switch {
-		case schema.Type == "object" || schema.Type == "" || schema.Type == "array":
-			// Empty class - not an alias
+		case schema.Type == "array":
+			// A top-level `type: array` definition, e.g. StringArray. Emitting
+			// an empty class here silently dropped the whole payload: the class
+			// had no field to put the list in, so every value round-tripped to
+			// nothing. It becomes a list wrapper instead.
+			model.IsListAlias = true
+			model.DataType = GetTypeDeclaration(schema.Items, definitions)
+		case schema.Type == "object" && schema.AdditionalProperties != nil:
+			// A free-form map definition, e.g. JSONMap. Same problem as above.
+			model.IsMapAlias = true
+			value := schema.AdditionalProperties
+			if value.Type == "" && value.Ref == "" {
+				// `additionalProperties: {}` means "any JSON". dynamic rather
+				// than Object, because Object cannot hold the nulls that
+				// arbitrary JSON contains.
+				model.DataType = "dynamic"
+			} else {
+				model.DataType = GetTypeDeclaration(value, definitions)
+			}
+		case schema.Type == "object" || schema.Type == "":
+			// Genuinely empty class - not an alias
 			model.IsAlias = false
 			model.DataType = "Object"
 		default:
 			// Simple scalar type alias (e.g., string, integer)
 			model.IsAlias = true
 		}
+	}
+
+	// Native Dart enum. Preference order is deliberate: a definition that
+	// carries its own enum list wins, and the config map is only a stand-in for
+	// specs that cannot express one.
+	if values, ok := nativeEnums[name]; ok {
+		model.IsNativeEnum = true
+		model.IsAlias = false
+		model.IsEnum = false
+		model.IsListAlias = false
+		model.IsMapAlias = false
+		model.EnumMembers = buildNativeEnumMembers(specEnumValues(schema), values)
 	}
 
 	// Build enum vars
@@ -177,7 +232,51 @@ func buildModel(name string, schema *swagger.Schema, definitions map[string]*swa
 	return model
 }
 
-func buildProperty(name string, schema *swagger.Schema, definitions map[string]*swagger.Schema, required bool) PropertyData {
+// specEnumValues returns the definition's own enum list as strings, or nil.
+func specEnumValues(schema *swagger.Schema) []string {
+	if len(schema.Enum) == 0 {
+		return nil
+	}
+	values := make([]string, 0, len(schema.Enum))
+	for _, raw := range schema.Enum {
+		if s, ok := raw.(string); ok {
+			values = append(values, s)
+		}
+	}
+	return values
+}
+
+// buildNativeEnumMembers turns wire values into Dart enum members, preferring
+// the spec's list over the configured one.
+//
+// An `unknown` member is always prepended: a client that predates a new server
+// value must decode it to something rather than throw, and unknown is the only
+// honest answer.
+func buildNativeEnumMembers(fromSpec []string, fromConfig []string) []EnumMember {
+	values := fromSpec
+	if len(values) == 0 {
+		values = fromConfig
+	}
+
+	members := make([]EnumMember, 0, len(values)+1)
+	members = append(members, EnumMember{Name: NativeEnumUnknownMember})
+	for _, value := range values {
+		if value == "" || value == NativeEnumUnknownMember {
+			continue
+		}
+		members = append(members, EnumMember{
+			Name:      Camelize(strings.ReplaceAll(value, "-", "_"), true),
+			WireValue: value,
+		})
+	}
+	return members
+}
+
+// NativeEnumUnknownMember is the fallback member every generated Dart enum
+// carries, for wire values this client has never heard of.
+const NativeEnumUnknownMember = "unknown"
+
+func buildProperty(name string, schema *swagger.Schema, definitions map[string]*swagger.Schema, required bool, nativeEnums map[string][]string) PropertyData {
 	pd := PropertyData{
 		Name:     ToVarName(name),
 		BaseName: name,
@@ -200,6 +299,11 @@ func buildProperty(name string, schema *swagger.Schema, definitions map[string]*
 		refName := swagger.ResolveRef(schema.Ref)
 		pd.Datatype = ToModelName(refName)
 		pd.ComplexType = ToModelName(refName)
+		if _, ok := nativeEnums[refName]; ok {
+			// A native Dart enum has no fromJson/toJson of its own; it is read
+			// and written through free functions instead.
+			pd.IsNativeEnumRef = true
+		}
 		return pd
 	}
 
@@ -224,19 +328,32 @@ func buildProperty(name string, schema *swagger.Schema, definitions map[string]*
 	// Handle map (object with additionalProperties)
 	if schema.Type == "object" && schema.AdditionalProperties != nil {
 		pd.IsMapContainer = true
-		inner := GetTypeDeclaration(schema.AdditionalProperties, definitions)
+		value := schema.AdditionalProperties
+		inner := GetTypeDeclaration(value, definitions)
 		pd.Datatype = "Map<String, " + inner + ">"
 		pd.DefaultValue = "{}"
+		pd.MapValueDatatype = inner
+		pd.MapValueIsDouble = inner == "double"
 
-		if schema.AdditionalProperties.Ref != "" {
-			refName := swagger.ResolveRef(schema.AdditionalProperties.Ref)
-			pd.ComplexType = ToModelName(refName)
-		} else if schema.AdditionalProperties.Type != "" {
-			// For non-ref additionalProperties, set complexType to the base
-			// mapped type (not the full generic). Only set for non-primitives.
-			baseType := getBaseSwaggerType(schema.AdditionalProperties.Type)
+		switch {
+		case value.Ref != "":
+			refName := ToModelName(swagger.ResolveRef(value.Ref))
+			pd.ComplexType = refName
+			pd.MapValueComplexType = refName
+		case value.Type == "array":
+			// A map whose values are lists. ComplexType is deliberately left
+			// empty here: it used to be set to the base type of "array", which
+			// is the literal "List", and the renderer then emitted
+			// `List.mapFromJson(...)` — valid Dart that always throws.
+			pd.MapValueIsList = true
+			if value.Items != nil && value.Items.Ref != "" {
+				pd.MapValueComplexType = ToModelName(swagger.ResolveRef(value.Items.Ref))
+			}
+		case value.Type != "":
+			baseType := getBaseSwaggerType(value.Type)
 			if !IsPrimitiveType(baseType) {
 				pd.ComplexType = baseType
+				pd.MapValueComplexType = baseType
 			}
 		}
 		return pd

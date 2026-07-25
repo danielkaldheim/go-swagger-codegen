@@ -21,6 +21,9 @@ swagger-codegen generate -i <swagger.json> [-o <output-dir>] [-c <config.json>]
 | `--input` | `-i` | Yes | | Path to the Swagger 2.0 JSON spec |
 | `--output` | `-o` | No | `output` | Output directory for generated code |
 | `--config` | `-c` | No | | Path to a config JSON file |
+| `--language` | `-l` | No | `dart` | Target language for code generation |
+| `--variant` | | No | | Language variant (e.g. `blocks` for `dart-blocks` templates) |
+| `--prune-unused-models` | | No | `false` | Only generate models reachable from the (non-excluded) API surface. Overrides `pruneUnusedModels` in the config when set. |
 
 ### Examples
 
@@ -46,7 +49,11 @@ The optional config file is a JSON object with the following fields:
   "pubVersion": "1.0.0",
   "pubDescription": "A Dart SDK for my API",
   "browserClient": false,
-  "useEnumExtension": true
+  "useEnumExtension": true,
+  "excludeApi": ["EntryApi"],
+  "excludeModel": ["AppleReferralData"],
+  "pruneUnusedModels": false,
+  "keepModel": ["OrderFilter"]
 }
 ```
 
@@ -57,6 +64,10 @@ The optional config file is a JSON object with the following fields:
 | `pubDescription` | string | `Swagger API client` | Package description in `pubspec.yaml` |
 | `browserClient` | bool | `false` | Reserved for browser client support |
 | `useEnumExtension` | bool | `true` | Use `x-enum-values` vendor extension for enum generation |
+| `excludeApi` | string[] | `[]` | API class names (e.g. `EntryApi`) to skip generating |
+| `excludeModel` | string[] | `[]` | Model class names to skip generating, regardless of usage |
+| `pruneUnusedModels` | bool | `false` | Drop models not transitively reachable from the API surface. Applied *after* `excludeApi`/`excludeModel`, so excluding an API also prunes the models only it needed |
+| `keepModel` | string[] | `[]` | Model class names to retain when `pruneUnusedModels` is on, even if no API references them (e.g. filter/query models). Their transitive dependencies are kept too. Unknown names are ignored |
 
 ## Output Structure
 

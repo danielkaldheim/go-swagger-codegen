@@ -32,8 +32,9 @@ func buildFuncMap() template.FuncMap {
 			return a == b
 		},
 		"escapeText":           escapeText,
+		"elementFromJson":      elementFromJson,
 		"renderOperations":     renderOperations,
-		"renderVarDecls":      renderVarDeclarations,
+		"renderVarDecls":       renderVarDeclarations,
 		"renderCtorParams":    renderConstructorParams,
 		"renderToStringVars":  renderToStringVars,
 		"renderFromJsonBody":  renderFromJsonBody,

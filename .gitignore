@@ -1,4 +1,5 @@
 swagger-codegen
+swagger-codegen.exe
 output/
 testdata/
 *.log

@@ -1,0 +1,45 @@
+{{define "list_alias"}}class {{.Classname}} {
+  final List<{{.DataType}}> values;
+
+  {{.Classname}}({List<{{.DataType}}>? values}) : values = values ?? [];
+
+  @override
+  String toString() {
+    return '{{.Classname}}[values=$values]';
+  }
+
+  /// Accepts the bare JSON array this type actually is, and also tolerates a
+  /// `{"values": [...]}` wrapper, because a cache that stored the old
+  /// object-shaped output may still hold one.
+  factory {{.Classname}}.fromJson(dynamic json) {
+    if (json == null) {
+      return {{.Classname}}();
+    }
+    if (json is List) {
+      return {{.Classname}}(
+        values: json.map((dynamic value) => {{elementFromJson .DataType "value"}}).toList(),
+      );
+    }
+    if (json is Map<String, dynamic> && json['values'] is List) {
+      return {{.Classname}}(
+        values: (json['values'] as List<dynamic>)
+            .map((dynamic value) => {{elementFromJson .DataType "value"}})
+            .toList(),
+      );
+    }
+    return {{.Classname}}();
+  }
+
+  List<{{.DataType}}> toJson() => values;
+
+  static List<{{.Classname}}> listFromJson(List<dynamic> json) {
+    return json.isEmpty ? [] : json.map((value) => {{.Classname}}.fromJson(value)).toList();
+  }
+
+  static Map<String, {{.Classname}}> mapFromJson(Map<String, dynamic> json) {
+    var map = <String, {{.Classname}}>{};
+    json.forEach((String key, dynamic value) => map[key] = {{.Classname}}.fromJson(value));
+    return map;
+  }
+}
+{{end}}

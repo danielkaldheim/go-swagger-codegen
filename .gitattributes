@@ -57,6 +57,7 @@ Dockerfile*     text eol=lf
 *.csv           text eol=lf
 *.html          text eol=lf
 *.txt           text eol=lf
+*.tmpl           text eol=lf
 
 # Binary formats git's text auto-detection must never touch. A mostly-ASCII
 # PDF (golden fixtures) would otherwise be CRLF-smudged on checkout, which

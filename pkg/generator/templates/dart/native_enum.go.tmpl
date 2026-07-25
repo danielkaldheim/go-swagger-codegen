@@ -1,0 +1,40 @@
+{{define "native_enum"}}enum {{.Classname}} {
+{{- range .EnumMembers}}
+  {{.Name}},
+{{- end}}
+}
+
+/// Decodes a wire value, falling back to [{{.Classname}}.unknown] for anything
+/// this client was not built with — a server that gains a value must not break
+/// an older client.
+{{.Classname}} {{camelizeLower .Classname}}FromJson(String? json) {
+  switch (json) {
+{{- range .EnumMembers}}
+{{- if not .IsUnknown}}
+    case '{{.WireValue}}':
+      return {{$.Classname}}.{{.Name}};
+{{- end}}
+{{- end}}
+    default:
+      return {{.Classname}}.unknown;
+  }
+}
+
+/// Encodes back to the wire value. [{{.Classname}}.unknown] encodes to null
+/// rather than inventing a value the server never sent.
+String? {{camelizeLower .Classname}}ToJson({{.Classname}}? value) {
+  if (value == null) {
+    return null;
+  }
+  switch (value) {
+{{- range .EnumMembers}}
+{{- if not .IsUnknown}}
+    case {{$.Classname}}.{{.Name}}:
+      return '{{.WireValue}}';
+{{- end}}
+{{- end}}
+    case {{.Classname}}.unknown:
+      return null;
+  }
+}
+{{end}}

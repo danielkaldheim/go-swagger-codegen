@@ -26,15 +26,23 @@ func htmlEscape(s string) string {
 
 // renderVarDeclarations renders the property declarations section of a class.
 // Matches the exact Mustache output format.
-func renderVarDeclarations(vars []codegen.PropertyData) string {
+//
+// It takes the whole model rather than just the vars because a class that
+// extends BaseModel redeclares BaseModel's `id`, and Dart's annotate_overrides
+// lint wants an @override on it. Without one every such model has to be
+// hand-edited after generation.
+func renderVarDeclarations(model codegen.ModelData) string {
 	var sb strings.Builder
-	for _, v := range vars {
+	for _, v := range model.Vars {
 		if v.Description != "" {
 			sb.WriteString("/* ")
 			sb.WriteString(escapeText(v.Description))
 			sb.WriteString(" */\n")
 		} else {
 			sb.WriteString("\n")
+		}
+		if model.HasId && v.Name == "id" {
+			sb.WriteString("      @override\n")
 		}
 		if v.IsListContainer {
 			sb.WriteString("      ")
@@ -102,16 +110,24 @@ func renderFromJsonBody(vars []codegen.PropertyData) string {
 			// DateTime: single line
 			fmt.Fprintf(&sb, "    %s = json['%s'] == null ? null : DateTime.parse(json['%s']);\n",
 				v.Name, v.BaseName, v.BaseName)
+		} else if v.IsNativeEnumRef {
+			// A Dart enum has no constructors to call; the generated free
+			// functions do the decoding, and unknown wire values land on the
+			// enum's unknown member instead of throwing.
+			fmt.Fprintf(&sb, "    %s = json['%s'] == null ? null : %sFromJson(json['%s']);\n",
+				v.Name, v.BaseName, codegen.Camelize(v.ComplexType, true), v.BaseName)
+		} else if v.IsMapContainer {
+			// Maps are handled ahead of the ComplexType branch because a map's
+			// value can be a list or a primitive, neither of which ComplexType
+			// describes. Assigning json['x'] straight to a typed map — which is
+			// what the primitive case used to do — throws at runtime.
+			renderMapFromJson(&sb, v)
 		} else if v.ComplexType != "" {
 			// Complex type
 			fmt.Fprintf(&sb, "    %s =\n", v.Name)
 			if v.IsListContainer {
 				// Complex list: 6 spaces indent, ; at column 0
 				fmt.Fprintf(&sb, "      json['%s'] == null ? [] : %s.listFromJson(json['%s'])\n;\n",
-					v.BaseName, v.ComplexType, v.BaseName)
-			} else if v.IsMapContainer {
-				// Complex map: blank lines from Mustache nesting, ; at column 0
-				fmt.Fprintf(&sb, "      \n      json['%s'] == null ? {} : %s.mapFromJson(json['%s'])\n      \n;\n",
 					v.BaseName, v.ComplexType, v.BaseName)
 			} else {
 				// Complex non-list, non-map: 2 blank lines from Mustache nesting, ; at column 0
@@ -139,6 +155,86 @@ func renderFromJsonBody(vars []codegen.PropertyData) string {
 	return sb.String()
 }
 
+// renderMapFromJson renders the fromJson assignment for a map-valued property.
+//
+// json.decode hands back Map<String, dynamic>, so every shape has to be
+// rebuilt into the declared map type rather than assigned across. The four
+// shapes are: a map of models, a map of lists (of models or of primitives), a
+// map of doubles, and a map of any other primitive.
+func renderMapFromJson(sb *strings.Builder, v codegen.PropertyData) {
+	source := fmt.Sprintf("json['%s']", v.BaseName)
+	fmt.Fprintf(sb, "    %s = %s == null\n        ? {}\n        : ", v.Name, source)
+
+	switch {
+	case v.MapValueIsList:
+		element := v.MapValueComplexType
+		if element != "" {
+			// Map<String, List<Model>>
+			fmt.Fprintf(sb, "(%s as Map<String, dynamic>).map((key, value) =>\n            MapEntry(key, %s.listFromJson(value as List<dynamic>)))",
+				source, element)
+		} else {
+			// Map<String, List<primitive>>
+			fmt.Fprintf(sb, "(%s as Map<String, dynamic>).map((key, value) =>\n            MapEntry(key, (value as List).map((item) => item as %s).toList()))",
+				source, mapListElementType(v.MapValueDatatype))
+		}
+	case v.MapValueComplexType != "":
+		// Map<String, Model>
+		fmt.Fprintf(sb, "%s.mapFromJson(%s as Map<String, dynamic>)", v.MapValueComplexType, source)
+	case v.MapValueIsDouble:
+		// JSON numbers decode as int when they have no fraction, so a plain
+		// cast to double fails on values like 3.
+		fmt.Fprintf(sb, "(%s as Map<String, dynamic>).map(\n            (key, value) => MapEntry(key, (value as num).toDouble()))", source)
+	default:
+		fmt.Fprintf(sb, "Map<String, %s>.from(%s as Map)", v.MapValueDatatype, source)
+	}
+
+	sb.WriteString(";\n")
+}
+
+// elementFromJson renders the expression that turns one decoded JSON element
+// into the Dart element type.
+//
+// Numbers need the num detour: JSON gives back int for a whole number even
+// where the schema says double, so a straight `as double` throws.
+func elementFromJson(datatype string, expr string) string {
+	switch datatype {
+	case "String":
+		return expr + ".toString()"
+	case "int":
+		return "(" + expr + " as num).toInt()"
+	case "double":
+		return "(" + expr + " as num).toDouble()"
+	case "bool", "Object", "dynamic":
+		return expr + " as " + datatype
+	default:
+		if IsDartPrimitive(datatype) {
+			return expr + " as " + datatype
+		}
+		// A generated model.
+		return datatype + ".fromJson(" + expr + ")"
+	}
+}
+
+// IsDartPrimitive reports whether a rendered Dart type needs no fromJson.
+func IsDartPrimitive(datatype string) bool {
+	switch datatype {
+	case "String", "int", "double", "num", "bool", "Object", "dynamic":
+		return true
+	}
+	return strings.HasPrefix(datatype, "List<") || strings.HasPrefix(datatype, "Map<")
+}
+
+// mapListElementType extracts T from "List<T>", for a map whose values are
+// lists of primitives.
+func mapListElementType(datatype string) string {
+	inner := strings.TrimPrefix(datatype, "List<")
+	inner = strings.TrimSuffix(inner, ">")
+	if inner == "" || inner == datatype {
+		return "dynamic"
+	}
+	return inner
+}
+
 // renderToJsonBody renders the toJson entries.
 func renderToJsonBody(vars []codegen.PropertyData) string {
 	var sb strings.Builder
@@ -151,6 +247,11 @@ func renderToJsonBody(vars []codegen.PropertyData) string {
 		if v.IsDateTime {
 			fmt.Fprintf(&sb, "      '%s': %s == null ? '' : %s!.toUtc().toIso8601String()%s\n",
 				v.BaseName, v.Name, v.Name, comma)
+		} else if v.IsNativeEnumRef {
+			// A Dart enum is not JSON-encodable; the free function maps it back
+			// to its wire value.
+			fmt.Fprintf(&sb, "      '%s': %sToJson(%s)%s\n",
+				v.BaseName, codegen.Camelize(v.ComplexType, true), v.Name, comma)
 		} else {
 			fmt.Fprintf(&sb, "      '%s': %s%s\n",
 				v.BaseName, v.Name, comma)
