@@ -6,18 +6,28 @@ import (
 )
 
 type Config struct {
-	PubName          string   `json:"pubName"`
-	PubVersion       string   `json:"pubVersion"`
-	PubDescription   string   `json:"pubDescription"`
-	BrowserClient    bool     `json:"browserClient"`
-	UseEnumExtension bool     `json:"useEnumExtension"`
-	ExcludeApi       []string `json:"excludeApi"`
-	ExcludeModel     []string `json:"excludeModel"`
-	PruneUnusedModels bool    `json:"pruneUnusedModels"`
-	KeepModel        []string `json:"keepModel"`
+	PubName            string   `json:"pubName"`
+	PubVersion         string   `json:"pubVersion"`
+	PubDescription     string   `json:"pubDescription"`
+	PackageName        string   `json:"packageName"`
+	PackageVersion     string   `json:"packageVersion"`
+	PackageDescription string   `json:"packageDescription"`
 
-	// NativeEnums renders the listed definitions as real Dart enums instead of
-	// string wrappers, keyed by definition name:
+	// DistributionName is the published (PyPI) package name when it differs
+	// from the import package. PEP 503 treats "famn-sdk" and "famnsdk" as
+	// different packages, so the derived dashed name silently forks the
+	// distribution once a client is published under another name.
+	DistributionName string `json:"distributionName"`
+	PythonRequires     string   `json:"pythonRequires"`
+	BrowserClient      bool     `json:"browserClient"`
+	UseEnumExtension   bool     `json:"useEnumExtension"`
+	ExcludeApi         []string `json:"excludeApi"`
+	ExcludeModel       []string `json:"excludeModel"`
+	PruneUnusedModels  bool     `json:"pruneUnusedModels"`
+	KeepModel          []string `json:"keepModel"`
+
+	// NativeEnums renders the listed definitions as real enums instead of
+	// string wrappers, keyed by definition name. It applies to Dart and Python:
 	//
 	//   "nativeEnums": { "DevicePlatform": ["web", "ios", "android"] }
 	//
@@ -37,6 +47,7 @@ func Load(path string) (*Config, error) {
 		PubName:          "swagger",
 		PubVersion:       "1.0.0",
 		PubDescription:   "Swagger API client",
+		PythonRequires:   ">=3.11",
 		BrowserClient:    false,
 		UseEnumExtension: true,
 	}

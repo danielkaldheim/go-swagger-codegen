@@ -1,0 +1,184 @@
+"""Async HTTP transport for the generated API classes."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable, Mapping
+from pathlib import Path
+from typing import IO, Any, Self, TypeAlias
+
+import aiohttp
+
+from .exceptions import ApiError
+from .models import _deserialize, _serialize
+
+FileValue: TypeAlias = bytes | bytearray | Path | IO[bytes] | tuple[str, bytes]
+
+_AUTH_SCHEMES: dict[str, dict[str, str]] = {
+{{- range .AuthMethods}}
+    {{pythonLiteral .Name}}: {
+        "type": {{pythonLiteral .Type}},
+        "in": {{pythonLiteral .Location}},
+        "name": {{pythonLiteral .KeyName}},
+    },
+{{- end}}
+}
+
+
+class ApiClient:
+    """Async API transport which can reuse an application-owned aiohttp session."""
+
+    def __init__(
+        self,
+        base_url: str = {{pythonLiteral .BasePath}},
+        *,
+        session: aiohttp.ClientSession | None = None,
+        default_headers: Mapping[str, str] | None = None,
+        timeout: aiohttp.ClientTimeout | None = None,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self._session = session
+        self._owns_session = session is None
+        self._default_headers = dict(default_headers or {})
+        self._timeout = timeout
+        self._api_keys: dict[str, tuple[str, str | None]] = {}
+        self._basic_auth: dict[str, aiohttp.BasicAuth] = {}
+        self._access_token: str | None = None
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await self.close()
+
+    async def close(self) -> None:
+        """Close only sessions created by this client."""
+        if self._owns_session and self._session is not None:
+            await self._session.close()
+            self._session = None
+
+    def set_api_key(self, scheme: str, value: str, *, prefix: str | None = None) -> None:
+        if scheme not in _AUTH_SCHEMES:
+            raise ValueError(f"Unknown authentication scheme: {scheme}")
+        self._api_keys[scheme] = (value, prefix)
+
+    def set_basic_auth(self, scheme: str, username: str, password: str) -> None:
+        if scheme not in _AUTH_SCHEMES:
+            raise ValueError(f"Unknown authentication scheme: {scheme}")
+        self._basic_auth[scheme] = aiohttp.BasicAuth(username, password)
+
+    def set_access_token(self, value: str) -> None:
+        self._access_token = value
+
+    async def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        query: Iterable[tuple[str, str]] = (),
+        headers: Mapping[str, str] | None = None,
+        body: Any = None,
+        form: Mapping[str, Any] | None = None,
+        files: Mapping[str, FileValue] | None = None,
+        content_type: str = "application/json",
+        auth_names: Iterable[str] = (),
+        response_type: Any = None,
+    ) -> Any:
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+
+        request_headers = {**self._default_headers, **dict(headers or {})}
+        request_query = list(query)
+        basic_auth = self._apply_auth(auth_names, request_query, request_headers)
+        kwargs: dict[str, Any] = {
+            "params": request_query,
+            "headers": request_headers,
+            "auth": basic_auth,
+        }
+        if self._timeout is not None:
+            kwargs["timeout"] = self._timeout
+
+        if files or content_type.startswith("multipart/"):
+            payload = aiohttp.FormData()
+            for name, value in (form or {}).items():
+                payload.add_field(name, _form_value(value))
+            for name, value in files.items():
+                filename, content = _file_content(value)
+                payload.add_field(name, content, filename=filename, content_type="application/octet-stream")
+            kwargs["data"] = payload
+        elif form or content_type == "application/x-www-form-urlencoded":
+            kwargs["data"] = {name: _form_value(value) for name, value in (form or {}).items()}
+            request_headers.setdefault("Content-Type", content_type)
+        elif body is not None:
+            kwargs["json"] = _serialize(body)
+            request_headers.setdefault("Content-Type", content_type)
+
+        async with self._session.request(method, self.base_url + path, **kwargs) as response:
+            raw = await response.read()
+            text = raw.decode(response.charset or "utf-8", errors="replace")
+            decoded: Any = None
+            if raw:
+                try:
+                    decoded = json.loads(raw)
+                except (json.JSONDecodeError, ValueError):
+                    decoded = text
+            if not 200 <= response.status < 300:
+                raise ApiError(
+                    response.status,
+                    response.reason or "API request failed",
+                    body=decoded,
+                    headers=dict(response.headers),
+                )
+            if response_type is None or not raw:
+                return None
+            if response_type is bytes and "json" not in response.content_type.lower():
+                return raw
+            return _deserialize(decoded, response_type)
+
+    def _apply_auth(
+        self,
+        auth_names: Iterable[str],
+        query: list[tuple[str, str]],
+        headers: dict[str, str],
+    ) -> aiohttp.BasicAuth | None:
+        basic_auth: aiohttp.BasicAuth | None = None
+        for auth_name in auth_names:
+            scheme = _AUTH_SCHEMES.get(auth_name)
+            if scheme is None:
+                raise ValueError(f"Unknown authentication scheme: {auth_name}")
+            if scheme["type"] == "basic":
+                basic_auth = self._basic_auth.get(auth_name, basic_auth)
+            elif scheme["type"] == "oauth2" and self._access_token:
+                headers["Authorization"] = f"Bearer {self._access_token}"
+            elif scheme["type"] == "apiKey":
+                configured = self._api_keys.get(auth_name)
+                if configured is None and self._access_token and scheme["name"].lower() == "authorization":
+                    configured = (self._access_token, "Bearer")
+                if configured is None:
+                    continue
+                value, prefix = configured
+                rendered = f"{prefix} {value}" if prefix else value
+                if scheme["in"] == "query":
+                    query.append((scheme["name"], rendered))
+                else:
+                    headers[scheme["name"]] = rendered
+        return basic_auth
+
+
+def _form_value(value: Any) -> str:
+    serialized = _serialize(value)
+    if isinstance(serialized, bool):
+        return "true" if serialized else "false"
+    if isinstance(serialized, (dict, list)):
+        return json.dumps(serialized, separators=(",", ":"))
+    return str(serialized)
+
+
+def _file_content(value: FileValue) -> tuple[str, bytes | bytearray | IO[bytes]]:
+    if isinstance(value, tuple):
+        return value
+    if isinstance(value, Path):
+        return value.name, value.read_bytes()
+    if isinstance(value, (bytes, bytearray)):
+        return "upload", value
+    return Path(str(getattr(value, "name", "upload"))).name, value

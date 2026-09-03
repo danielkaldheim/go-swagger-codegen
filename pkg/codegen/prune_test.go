@@ -45,8 +45,8 @@ func TestPruneUnusedModels_Synthetic(t *testing.T) {
 		}},
 		{Classname: "Category"},
 		{Classname: "Tag"},
-		{Classname: "Orphan"},        // referenced by nobody
-		{Classname: "OrphanChild"},   // only referenced by Orphan
+		{Classname: "Orphan"},      // referenced by nobody
+		{Classname: "OrphanChild"}, // only referenced by Orphan
 	}
 	models[3].Vars = []PropertyData{{Datatype: "OrphanChild", ComplexType: "OrphanChild"}}
 
@@ -81,6 +81,39 @@ func TestPruneUnusedModels_Synthetic(t *testing.T) {
 		if !keepNames[want] {
 			t.Errorf("keep: expected %q to be kept, but it was pruned", want)
 		}
+	}
+}
+
+func TestPruneUnusedModels_KeepsAliasTargets(t *testing.T) {
+	definitions := map[string]*swagger.Schema{
+		"DeletedAt": {Ref: "#/definitions/NullTime"},
+		"NullTime": {Type: "object", Properties: map[string]*swagger.Schema{
+			"Time":  {Type: "string", Format: "date-time"},
+			"Valid": {Type: "boolean"},
+		}},
+		"Orphan": {Type: "object"},
+	}
+	models := BuildModels(definitions, definitions, true, []string{"DeletedAt", "NullTime", "Orphan"}, nil)
+	if models[0].DataType != "NullTime" {
+		t.Fatalf("DeletedAt underlying type = %q, want NullTime", models[0].DataType)
+	}
+	apis := []ApiData{{Classname: "RecordApi", Operations: []OperationData{
+		{ReturnType: "DeletedAt", ReturnBaseType: "DeletedAt"},
+	}}}
+
+	got := PruneUnusedModels(models, apis, nil)
+	gotNames := make(map[string]bool, len(got))
+	for _, model := range got {
+		gotNames[model.Classname] = true
+	}
+
+	for _, want := range []string{"DeletedAt", "NullTime"} {
+		if !gotNames[want] {
+			t.Errorf("expected %q to be kept, but it was pruned", want)
+		}
+	}
+	if gotNames["Orphan"] {
+		t.Error("expected Orphan to be pruned")
 	}
 }
 
@@ -120,6 +153,12 @@ func TestPruneUnusedModels_Testdata(t *testing.T) {
 
 	// Closure check: every model reference inside a kept model must itself be kept.
 	for _, m := range pruned {
+		for _, ref := range modelRefsIn(m.DataType, knownAll) {
+			if !kept[ref] {
+				t.Errorf("kept model %q references pruned model %q via its underlying type",
+					m.Classname, ref)
+			}
+		}
 		for _, v := range m.Vars {
 			for _, ref := range modelRefsIn(v.Datatype, knownAll) {
 				if !kept[ref] {

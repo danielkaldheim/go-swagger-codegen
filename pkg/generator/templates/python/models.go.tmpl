@@ -1,0 +1,76 @@
+"""Data models generated from the Swagger specification."""
+
+from __future__ import annotations
+
+import base64
+from dataclasses import dataclass
+from datetime import date, datetime
+from enum import Enum
+from types import UnionType
+from typing import Any, Mapping, Self, TypeAlias, Union, get_args, get_origin
+from uuid import UUID
+
+
+def _deserialize(value: Any, target_type: Any) -> Any:
+    if value is None or target_type is Any:
+        return value
+
+    origin = get_origin(target_type)
+    arguments = get_args(target_type)
+    if origin is list:
+        item_type = arguments[0] if arguments else Any
+        return [_deserialize(item, item_type) for item in value]
+    if origin is dict:
+        value_type = arguments[1] if len(arguments) > 1 else Any
+        return {str(key): _deserialize(item, value_type) for key, item in value.items()}
+    if origin in (Union, UnionType):
+        concrete = next((item for item in arguments if item is not type(None)), Any)
+        return _deserialize(value, concrete)
+
+    if target_type is datetime:
+        if isinstance(value, datetime):
+            return value
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if target_type is date:
+        if isinstance(value, date):
+            return value
+        return date.fromisoformat(str(value))
+    if target_type is UUID:
+        return value if isinstance(value, UUID) else UUID(str(value))
+    if target_type is bytes:
+        return value if isinstance(value, bytes) else base64.b64decode(value)
+    if target_type is bool:
+        return value if isinstance(value, bool) else str(value).lower() in ("1", "true", "yes", "on")
+    if isinstance(target_type, type) and issubclass(target_type, Enum):
+        return target_type(value)
+    if isinstance(target_type, type) and hasattr(target_type, "from_dict"):
+        return target_type.from_dict(value)
+    if target_type in (str, int, float):
+        return target_type(value)
+    return value
+
+
+def _serialize(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, Enum):
+        return None if value.name == "UNKNOWN" else value.value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, bytes):
+        return base64.b64encode(value).decode("ascii")
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    if isinstance(value, Mapping):
+        return {str(key): _serialize(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_serialize(item) for item in value]
+    return value
+
+
+{{renderPythonModels .Models}}
+
+__all__ = [{{range .Models}}{{pythonLiteral .ClassName}}, {{end}}]
+

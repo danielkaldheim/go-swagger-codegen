@@ -65,6 +65,11 @@ func PruneUnusedModels(models []ModelData, apis []ApiData, keep []string) []Mode
 		if !ok {
 			continue
 		}
+		// Aliases and top-level list/map wrappers carry their dependency in
+		// DataType rather than Vars. Without following it, a reachable alias such
+		// as DeletedAt -> NullTime survives pruning while its target is removed,
+		// leaving generated clients with an undefined type name.
+		enqueue(m.DataType)
 		for _, v := range m.Vars {
 			enqueue(v.Datatype)
 			enqueue(v.ComplexType)

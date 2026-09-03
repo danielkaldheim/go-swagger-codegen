@@ -45,6 +45,10 @@ func (g *Generator) templateDir() string {
 }
 
 func (g *Generator) Generate() error {
+	if g.language == "python" {
+		return g.generatePython()
+	}
+
 	// Build model data
 	g.models = codegen.BuildModels(g.spec.Definitions, g.spec.Definitions, g.config.UseEnumExtension, g.spec.DefinitionOrder, g.config.NativeEnums)
 
@@ -199,9 +203,9 @@ func (g *Generator) generateSupportingFiles() error {
 	gd := g.globalData()
 
 	supportingFiles := []struct {
-		template       string
-		path           string
-		stripTrailing  bool
+		template      string
+		path          string
+		stripTrailing bool
 	}{
 		{"pubspec.go.tmpl", filepath.Join(g.outputDir, "pubspec.yaml"), true},
 		{"analysis_options.go.tmpl", filepath.Join(g.outputDir, ".analysis_options"), true},

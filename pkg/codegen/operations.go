@@ -16,29 +16,29 @@ type ApiData struct {
 }
 
 type OperationData struct {
-	Nickname        string
-	OperationId     string
-	HttpMethod      string
-	Path            string
-	Summary         string
-	Notes           string
-	ReturnType      string
-	ReturnBaseType  string
-	IsListContainer bool
-	IsMapContainer  bool
-	IsDeprecated    bool
+	Nickname          string
+	OperationId       string
+	HttpMethod        string
+	Path              string
+	Summary           string
+	Notes             string
+	ReturnType        string
+	ReturnBaseType    string
+	IsListContainer   bool
+	IsMapContainer    bool
+	IsDeprecated      bool
 	HasOptionalParams bool
-	HasParams       bool
-	HasFormParams   bool
-	HasMore         bool
-	AllParams       []ParamData
-	PathParams      []ParamData
-	QueryParams     []ParamData
-	HeaderParams    []ParamData
-	BodyParam       *ParamData
-	FormParams      []ParamData
-	Consumes        []MediaType
-	AuthMethods     []AuthMethodRef
+	HasParams         bool
+	HasFormParams     bool
+	HasMore           bool
+	AllParams         []ParamData
+	PathParams        []ParamData
+	QueryParams       []ParamData
+	HeaderParams      []ParamData
+	BodyParam         *ParamData
+	FormParams        []ParamData
+	Consumes          []MediaType
+	AuthMethods       []AuthMethodRef
 }
 
 type ParamData struct {
@@ -72,13 +72,13 @@ type AuthMethodRef struct {
 }
 
 type AuthMethodData struct {
-	Name           string
-	IsBasic        bool
-	IsApiKey       bool
-	IsOAuth        bool
-	IsKeyInHeader  bool
-	IsKeyInQuery   bool
-	KeyParamName   string
+	Name          string
+	IsBasic       bool
+	IsApiKey      bool
+	IsOAuth       bool
+	IsKeyInHeader bool
+	IsKeyInQuery  bool
+	KeyParamName  string
 }
 
 // BuildApis extracts API data from swagger paths, grouped by tag.
@@ -183,8 +183,8 @@ func buildOperation(path, method string, op *swagger.Operation, spec *swagger.Sp
 	}
 
 	// Auth methods
-	var securityReqs []map[string][]string
-	if len(op.Security) > 0 {
+	securityReqs := spec.Security
+	if op.SecurityPresent {
 		securityReqs = op.Security
 	}
 	for _, sec := range securityReqs {

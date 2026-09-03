@@ -1,0 +1,20 @@
+{{pythonLiteral .PackageDescription}}
+
+from .api_client import ApiClient, FileValue
+from .apis import *
+from .exceptions import ApiError
+from .models import *
+
+__version__ = {{pythonLiteral .PackageVersion}}
+
+__all__ = [
+    "ApiClient",
+    "ApiError",
+    "FileValue",
+{{- range .Apis}}
+    {{pythonLiteral .ClassName}},
+{{- end}}
+{{- range .Models}}
+    {{pythonLiteral .ClassName}},
+{{- end}}
+]

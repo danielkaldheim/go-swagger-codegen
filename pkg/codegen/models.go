@@ -183,6 +183,12 @@ func buildModel(name string, schema *swagger.Schema, definitions map[string]*swa
 		// In Java codegen, object types and array types become classes,
 		// while simple scalar types (string, integer) become type aliases.
 		switch {
+		case schema.Ref != "":
+			// Preserve the referenced type even though the Dart backend continues
+			// to render top-level $ref definitions as wrapper classes. The model
+			// dependency graph needs this edge so pruning cannot keep the wrapper
+			// while dropping its target (for example DeletedAt -> NullTime).
+			model.IsAlias = false
 		case schema.Type == "array":
 			// A top-level `type: array` definition, e.g. StringArray. Emitting
 			// an empty class here silently dropped the whole payload: the class

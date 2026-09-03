@@ -16,6 +16,7 @@ type Spec struct {
 	Paths               map[string]PathItem           `json:"paths"`
 	Definitions         map[string]*Schema            `json:"definitions"`
 	SecurityDefinitions map[string]SecurityDefinition `json:"securityDefinitions"`
+	Security            []map[string][]string         `json:"security"`
 
 	// PathOrder preserves the order of paths from the original JSON
 	PathOrder []string `json:"-"`
@@ -59,19 +60,37 @@ type Operation struct {
 	Consumes    []string              `json:"consumes"`
 	Produces    []string              `json:"produces"`
 	Security    []map[string][]string `json:"security"`
-	Deprecated  bool                  `json:"deprecated"`
+	// SecurityPresent distinguishes an omitted security field (inherit the
+	// top-level requirement) from an explicit empty array (public operation).
+	SecurityPresent bool `json:"-"`
+	Deprecated      bool `json:"deprecated"`
+}
+
+func (o *Operation) UnmarshalJSON(data []byte) error {
+	type alias Operation
+	var decoded alias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*o = Operation(decoded)
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	_, o.SecurityPresent = raw["security"]
+	return nil
 }
 
 type Parameter struct {
-	Name             string  `json:"name"`
-	In               string  `json:"in"`
-	Description      string  `json:"description"`
-	Required         bool    `json:"required"`
-	Type             string  `json:"type"`
-	Format           string  `json:"format"`
-	Schema           *Schema `json:"schema,omitempty"`
-	CollectionFormat string  `json:"collectionFormat"`
-	Items            *Schema `json:"items,omitempty"`
+	Name             string        `json:"name"`
+	In               string        `json:"in"`
+	Description      string        `json:"description"`
+	Required         bool          `json:"required"`
+	Type             string        `json:"type"`
+	Format           string        `json:"format"`
+	Schema           *Schema       `json:"schema,omitempty"`
+	CollectionFormat string        `json:"collectionFormat"`
+	Items            *Schema       `json:"items,omitempty"`
 	Enum             []interface{} `json:"enum,omitempty"`
 	Default          interface{}   `json:"default,omitempty"`
 }

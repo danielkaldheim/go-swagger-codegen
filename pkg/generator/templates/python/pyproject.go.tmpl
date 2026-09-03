@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = {{pythonLiteral .DistributionName}}
+version = {{pythonLiteral .PackageVersion}}
+description = {{pythonLiteral .PackageDescription}}
+readme = "README.md"
+requires-python = {{pythonLiteral .PythonRequires}}
+dependencies = ["aiohttp>=3.9.0"]
+{{- if .InfoEmail}}
+authors = [{ email = {{pythonLiteral .InfoEmail}} }]
+{{- end}}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+

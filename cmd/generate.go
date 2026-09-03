@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	inputFile  string
-	outputDir  string
-	configFile string
-	language   string
-	variant    string
+	inputFile         string
+	outputDir         string
+	configFile        string
+	language          string
+	variant           string
 	pruneUnusedModels bool
 )
 
@@ -23,7 +23,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Path to swagger.json (required)")
 	generateCmd.Flags().StringVarP(&outputDir, "output", "o", "output", "Output directory")
 	generateCmd.Flags().StringVarP(&configFile, "config", "c", "", "Path to config.json")
-	generateCmd.Flags().StringVarP(&language, "language", "l", "dart", "Target language for code generation")
+	generateCmd.Flags().StringVarP(&language, "language", "l", "dart", "Target language for code generation (dart or python)")
 	generateCmd.Flags().StringVar(&variant, "variant", "", "Language variant (e.g., 'blocks' for dart-blocks templates)")
 	generateCmd.Flags().BoolVar(&pruneUnusedModels, "prune-unused-models", false, "Only generate models reachable from the (non-excluded) API surface")
 	generateCmd.MarkFlagRequired("input")

@@ -1,0 +1,44 @@
+"""Generated asynchronous API endpoint classes."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+from urllib.parse import quote
+
+from .api_client import ApiClient, FileValue
+from .models import *
+from .models import _serialize
+
+
+def _query_value(value: Any) -> str:
+    value = _serialize(value)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, separators=(",", ":"))
+    return str(value)
+
+
+def _add_query(
+    query: list[tuple[str, str]],
+    name: str,
+    value: Any,
+    collection_format: str,
+) -> None:
+    if value is None:
+        return
+    if not isinstance(value, (list, tuple)):
+        query.append((name, _query_value(value)))
+        return
+    if collection_format == "multi":
+        query.extend((name, _query_value(item)) for item in value)
+        return
+    separator = {"ssv": " ", "tsv": "\t", "pipes": "|"}.get(collection_format, ",")
+    query.append((name, separator.join(_query_value(item) for item in value)))
+
+
+{{renderPythonAPIs .Apis}}
+
+__all__ = [{{range .Apis}}{{pythonLiteral .ClassName}}, {{end}}]
+
