@@ -27,7 +27,7 @@
 
   /// Returns a copy with one entry set, or removed when [value] is null.
   /// Free-form maps are edited far more often than they are replaced.
-  {{.Classname}} copyWithEntry(String key, {{.DataType}}? value) {
+  {{.Classname}} copyWithEntry(String key, {{if eq .DataType "dynamic"}}dynamic{{else}}{{.DataType}}?{{end}} value) {
     final next = Map<String, {{.DataType}}>.from(data);
     if (value == null) {
       next.remove(key);
