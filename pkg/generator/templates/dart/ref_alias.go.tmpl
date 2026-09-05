@@ -1,0 +1,6 @@
+{{define "ref_alias"}}/// {{.Classname}} is another name for [{{.DataType}}]: the spec declares it
+/// as a bare `$ref`, so on the wire it is exactly that model. A typedef keeps
+/// `{{.Classname}}.fromJson`, `listFromJson` and `toJson` working through the
+/// alias instead of decoding the payload into an empty class.
+typedef {{.Classname}} = {{.DataType}};
+{{end}}

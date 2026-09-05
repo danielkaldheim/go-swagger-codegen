@@ -16,6 +16,7 @@ type ModelData struct {
 	IsAlias          bool
 	IsListAlias      bool // top-level `type: array`; DataType is the element type
 	IsMapAlias       bool // top-level free-form map; DataType is the value type
+	IsRefAlias       bool // top-level `$ref`; DataType is the referenced model
 	IsNativeEnum     bool // render as a real Dart enum rather than a string wrapper
 	EnumMembers      []EnumMember
 	HasVars          bool
@@ -184,11 +185,13 @@ func buildModel(name string, schema *swagger.Schema, definitions map[string]*swa
 		// while simple scalar types (string, integer) become type aliases.
 		switch {
 		case schema.Ref != "":
-			// Preserve the referenced type even though the Dart backend continues
-			// to render top-level $ref definitions as wrapper classes. The model
-			// dependency graph needs this edge so pruning cannot keep the wrapper
-			// while dropping its target (for example DeletedAt -> NullTime).
-			model.IsAlias = false
+			// A definition that is nothing but a $ref, e.g. DeletedAt -> NullTime
+			// or a response type declared as an alias of a model. It used to be
+			// rendered as an empty class, which decoded every payload to nothing;
+			// Dart renders it as a typedef of the target instead. DataType already
+			// names the target, which also gives pruning the edge it needs so the
+			// alias cannot survive without its model.
+			model.IsRefAlias = true
 		case schema.Type == "array":
 			// A top-level `type: array` definition, e.g. StringArray. Emitting
 			// an empty class here silently dropped the whole payload: the class
@@ -227,6 +230,7 @@ func buildModel(name string, schema *swagger.Schema, definitions map[string]*swa
 		model.IsEnum = false
 		model.IsListAlias = false
 		model.IsMapAlias = false
+		model.IsRefAlias = false
 		model.EnumMembers = buildNativeEnumMembers(specEnumValues(schema), values)
 	}
 
