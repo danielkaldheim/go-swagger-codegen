@@ -44,7 +44,11 @@ func renderVarDeclarations(model codegen.ModelData) string {
 		if model.HasId && v.Name == "id" {
 			sb.WriteString("      @override\n")
 		}
-		if v.IsListContainer {
+		if v.IsListContainer && v.Required {
+			// A required list always exists, so it starts empty. An optional
+			// list must start null: a request model built without it would
+			// otherwise send `[]`, which a PATCH reads as "replace with
+			// nothing" and wipes the server's items.
 			sb.WriteString("      ")
 			sb.WriteString(v.Datatype)
 			sb.WriteString("? ")

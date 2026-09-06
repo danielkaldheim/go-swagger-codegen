@@ -122,6 +122,11 @@ const testPythonSwagger = `{
     },
     "PetState": {"type": "string", "enum": ["home", "away"]},
 	"PetList": {"type": "array", "items": {"$ref": "#/definitions/Pet"}},
+	"Kennel": {
+	  "type": "object",
+	  "required": ["pets"],
+	  "properties": {"pets": {"type": "array", "items": {"$ref": "#/definitions/Pet"}}}
+	},
 	"DeletedAt": {"$ref": "#/definitions/NullTime"},
 	"NullTime": {
 	  "type": "object",
