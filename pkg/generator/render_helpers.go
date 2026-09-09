@@ -423,9 +423,11 @@ func renderOperation(sb *strings.Builder, op *codegen.OperationData) {
 			if p.NotFile {
 				fmt.Fprintf(sb, "      \n")
 				if !p.Required {
-					fmt.Fprintf(sb, "        mp.fields['%s'] = parameterToString(%s);\n", p.BaseName, p.ParamName)
-				} else {
-					fmt.Fprintf(sb, "        mp.fields['%s'] = parameterToString(%s);\n", p.BaseName, p.ParamName)
+					fmt.Fprintf(sb, "        if (%s != null) {\n", p.ParamName)
+				}
+				fmt.Fprintf(sb, "        mp.fields['%s'] = parameterToString(%s);\n", p.BaseName, p.ParamName)
+				if !p.Required {
+					sb.WriteString("        }\n")
 				}
 			}
 			if p.IsFile {
@@ -433,7 +435,6 @@ func renderOperation(sb *strings.Builder, op *codegen.OperationData) {
 				if !p.Required {
 					fmt.Fprintf(sb, "        if(%s != null) {\n", p.ParamName)
 				}
-				fmt.Fprintf(sb, "        mp.fields['%s'] = %s.field;\n", p.BaseName, p.ParamName)
 				fmt.Fprintf(sb, "        mp.files.add(%s);\n", p.ParamName)
 				if !p.Required {
 					sb.WriteString("        }\n")

@@ -83,7 +83,6 @@ func renderModelDoc(model codegen.ModelData, pubName string) string {
 	}
 
 	sb.WriteString("\n[[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)\n")
-	sb.WriteString("\n\n")
 
 	return sb.String()
 }
@@ -161,8 +160,12 @@ func renderApiDoc(api codegen.ApiData, gd GlobalData) string {
 
 	// Method summary table
 	for _, op := range api.Operations {
-		fmt.Fprintf(&sb, "[**%s**](%s.md#%s) | **%s** %s | %s\n",
-			op.Nickname, api.Classname, op.Nickname, op.HttpMethod, op.Path, mustacheEscape(op.Summary))
+		fmt.Fprintf(&sb, "[**%s**](%s.md#%s) | **%s** %s |",
+			op.Nickname, api.Classname, op.Nickname, op.HttpMethod, op.Path)
+		if summary := strings.TrimSpace(mustacheEscape(op.Summary)); summary != "" {
+			fmt.Fprintf(&sb, " %s", summary)
+		}
+		sb.WriteString("\n")
 	}
 
 	sb.WriteString("\n")
@@ -171,8 +174,6 @@ func renderApiDoc(api codegen.ApiData, gd GlobalData) string {
 	for _, op := range api.Operations {
 		renderApiOpDoc(&sb, &op, &api, &gd)
 	}
-
-	sb.WriteString("\n")
 
 	return sb.String()
 }
@@ -205,7 +206,7 @@ func renderApiOpDoc(sb *strings.Builder, op *codegen.OperationData, api *codegen
 	fmt.Fprintf(sb, "%s\n", op.Notes)
 
 	// Example
-	sb.WriteString("\n### Example \n")
+	sb.WriteString("\n### Example\n")
 	sb.WriteString("```dart\n")
 	fmt.Fprintf(sb, "import 'package:%s/api.dart';\n", gd.PubName)
 
@@ -232,17 +233,21 @@ func renderApiOpDoc(sb *strings.Builder, op *codegen.OperationData, api *codegen
 
 	// Param var declarations (descriptions go through escapeText like Java codegen)
 	for _, p := range op.AllParams {
-		desc := escapeText(p.Description)
+		desc := strings.TrimSpace(escapeText(p.Description))
 		if p.IsBodyParam {
-			fmt.Fprintf(sb, "var %s = %s(); // %s | %s\n", p.ParamName, p.DataType, p.DataType, desc)
+			fmt.Fprintf(sb, "var %s = %s(); // %s |", p.ParamName, p.DataType, p.DataType)
 		} else {
 			example := docParamExample(p)
-			fmt.Fprintf(sb, "var %s = %s; // %s | %s\n", p.ParamName, example, p.DataType, desc)
+			fmt.Fprintf(sb, "var %s = %s; // %s |", p.ParamName, example, p.DataType)
 		}
+		if desc != "" {
+			fmt.Fprintf(sb, " %s", desc)
+		}
+		sb.WriteString("\n")
 	}
 
 	// Try/catch
-	sb.WriteString("\ntry { \n")
+	sb.WriteString("\ntry {\n")
 	if op.ReturnType != "" {
 		sb.WriteString("    var result = ")
 	} else {
@@ -271,15 +276,19 @@ func renderApiOpDoc(sb *strings.Builder, op *codegen.OperationData, api *codegen
 		sb.WriteString("------------- | ------------- | ------------- | -------------\n")
 		for _, p := range op.AllParams {
 			typeStr := docParamType(p)
-			notes := ""
+			notes := make([]string, 0, 2)
 			if !p.Required {
-				notes = "[optional] "
+				notes = append(notes, "[optional]")
 			}
 			if p.DefaultValue != "" {
-				notes += fmt.Sprintf("[default to %s]", p.DefaultValue)
+				notes = append(notes, fmt.Sprintf("[default to %s]", p.DefaultValue))
 			}
 			desc := mustacheEscape(escapeText(p.Description))
-			fmt.Fprintf(sb, " **%s** | %s| %s | %s\n", p.ParamName, typeStr, desc, notes)
+			fmt.Fprintf(sb, " **%s** | %s| %s |", p.ParamName, typeStr, desc)
+			if len(notes) > 0 {
+				fmt.Fprintf(sb, " %s", strings.Join(notes, " "))
+			}
+			sb.WriteString("\n")
 		}
 	} else {
 		sb.WriteString("This endpoint does not need any parameter.\n")
