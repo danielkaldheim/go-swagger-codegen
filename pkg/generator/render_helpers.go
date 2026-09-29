@@ -98,6 +98,14 @@ func renderToStringVars(vars []codegen.PropertyData) string {
 	var sb strings.Builder
 	for _, v := range vars {
 		sb.WriteString(v.Name)
+		// Debug strings are frequently attached to logs and error reports. Wire
+		// serialization still carries credentials, but diagnostics must not.
+		name := strings.ToLower(strings.NewReplacer("_", "", "-", "").Replace(v.BaseName))
+		switch name {
+		case "token", "accesstoken", "refreshtoken", "idtoken", "password", "secret", "clientsecret", "apikey", "authorization":
+			sb.WriteString("=[redacted], ")
+			continue
+		}
 		sb.WriteString("=$")
 		sb.WriteString(v.Name)
 		sb.WriteString(", ")
