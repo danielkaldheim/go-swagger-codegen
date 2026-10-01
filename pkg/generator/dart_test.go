@@ -134,3 +134,34 @@ func assertFileNotContains(t *testing.T, path string, values ...string) {
 		}
 	}
 }
+
+// The SDK is a workspace package: never published, and its base types come from
+// crudus_common, as a path dependency when the config names a checkout.
+func TestGenerateDartSDK_PubspecUsesCrudusCommon(t *testing.T) {
+	spec, err := swagger.Parse([]byte(testPythonSwagger))
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	for _, tc := range []struct {
+		name string
+		path string
+		want string
+	}{
+		{"hosted", "", "  crudus_common: '>=1.0.0'\n"},
+		{"path", "../../packages/crudus_common", "  crudus_common:\n    path: ../../packages/crudus_common\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output := t.TempDir()
+			cfg := &config.Config{PubName: "famn_sdk", PubVersion: "0.1.0", PubDescription: "Famn client", CrudusCommonPath: tc.path, UseEnumExtension: true}
+			if err := New(cfg, spec, output, "dart", "").Generate(); err != nil {
+				t.Fatalf("generate Dart SDK: %v", err)
+			}
+			assertFileContains(t, filepath.Join(output, "pubspec.yaml"), "publish_to: none\n", tc.want, "environment:\n  sdk:")
+			for _, gone := range []string{filepath.Join("lib", "api_exception.dart"), filepath.Join("lib", "model", "base_model.dart")} {
+				if _, err := os.Stat(filepath.Join(output, gone)); err == nil {
+					t.Errorf("%s is still generated; crudus_common replaces it", gone)
+				}
+			}
+		})
+	}
+}

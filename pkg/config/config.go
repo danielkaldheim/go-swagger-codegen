@@ -6,25 +6,30 @@ import (
 )
 
 type Config struct {
-	PubName            string   `json:"pubName"`
-	PubVersion         string   `json:"pubVersion"`
-	PubDescription     string   `json:"pubDescription"`
-	PackageName        string   `json:"packageName"`
-	PackageVersion     string   `json:"packageVersion"`
-	PackageDescription string   `json:"packageDescription"`
+	PubName        string `json:"pubName"`
+	PubVersion     string `json:"pubVersion"`
+	PubDescription string `json:"pubDescription"`
+	// CrudusCommonPath points the generated pubspec at a local checkout of the
+	// crudus_common package (relative to the SDK directory). Empty keeps the
+	// hosted constraint. The generated models and API client import
+	// crudus_common instead of carrying their own base model and exception.
+	CrudusCommonPath   string `json:"crudusCommonPath"`
+	PackageName        string `json:"packageName"`
+	PackageVersion     string `json:"packageVersion"`
+	PackageDescription string `json:"packageDescription"`
 
 	// DistributionName is the published (PyPI) package name when it differs
 	// from the import package. PEP 503 treats "famn-sdk" and "famnsdk" as
 	// different packages, so the derived dashed name silently forks the
 	// distribution once a client is published under another name.
-	DistributionName string `json:"distributionName"`
-	PythonRequires     string   `json:"pythonRequires"`
-	BrowserClient      bool     `json:"browserClient"`
-	UseEnumExtension   bool     `json:"useEnumExtension"`
-	ExcludeApi         []string `json:"excludeApi"`
-	ExcludeModel       []string `json:"excludeModel"`
-	PruneUnusedModels  bool     `json:"pruneUnusedModels"`
-	KeepModel          []string `json:"keepModel"`
+	DistributionName  string   `json:"distributionName"`
+	PythonRequires    string   `json:"pythonRequires"`
+	BrowserClient     bool     `json:"browserClient"`
+	UseEnumExtension  bool     `json:"useEnumExtension"`
+	ExcludeApi        []string `json:"excludeApi"`
+	ExcludeModel      []string `json:"excludeModel"`
+	PruneUnusedModels bool     `json:"pruneUnusedModels"`
+	KeepModel         []string `json:"keepModel"`
 
 	// NativeEnums renders the listed definitions as real enums instead of
 	// string wrappers, keyed by definition name. It applies to Dart and Python:

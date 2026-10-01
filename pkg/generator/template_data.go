@@ -7,17 +7,19 @@ type GlobalData struct {
 	PubName        string
 	PubVersion     string
 	PubDescription string
-	BrowserClient  bool
-	BasePath       string
-	AppVersion     string
-	AppDescription string
-	InfoEmail      string
-	ApiDocPath     string
-	ModelDocPath   string
-	Models         []codegen.ModelData
-	Apis           []codegen.ApiData
-	AuthMethods    []codegen.AuthMethodData
-	ApiInfo        *ApiInfo
+	// CrudusCommonPath renders crudus_common as a path dependency when set.
+	CrudusCommonPath string
+	BrowserClient    bool
+	BasePath         string
+	AppVersion       string
+	AppDescription   string
+	InfoEmail        string
+	ApiDocPath       string
+	ModelDocPath     string
+	Models           []codegen.ModelData
+	Apis             []codegen.ApiData
+	AuthMethods      []codegen.AuthMethodData
+	ApiInfo          *ApiInfo
 }
 
 type ApiInfo struct {

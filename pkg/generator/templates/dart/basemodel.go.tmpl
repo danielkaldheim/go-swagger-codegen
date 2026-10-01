@@ -1,9 +1,0 @@
-part of {{.PubName}}.api;
-
-abstract class BaseModel {
-  String? id;
-  Map<String, dynamic> toJson();
-
-  BaseModel(); // default constructor
-  BaseModel.fromJson(Map<String, dynamic> json);
-}

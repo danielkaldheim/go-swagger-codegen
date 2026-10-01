@@ -72,6 +72,7 @@ The optional config file is a JSON object with the following fields:
 | `pubName` | string | `swagger` | Dart package name (used in `pubspec.yaml` and `part of` directives) |
 | `pubVersion` | string | `1.0.0` | Package version in `pubspec.yaml` |
 | `pubDescription` | string | `Swagger API client` | Package description in `pubspec.yaml` |
+| `crudusCommonPath` | string | (hosted `>=1.0.0`) | Path to a local `crudus_common` checkout, relative to the SDK; the generated `pubspec.yaml` then uses a path dependency. The pubspec always carries `publish_to: none`. |
 | `packageName` | string | value of `pubName` | Python import package name; normalized to snake case |
 | `packageVersion` | string | value of `pubVersion` | Python project version in `pyproject.toml` |
 | `packageDescription` | string | value of `pubDescription` | Python project description |
